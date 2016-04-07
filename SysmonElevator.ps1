@@ -56,21 +56,32 @@ ForEach ($Event in $Events) {
 			}
 			
 			If ($match){
-				$imageACLs = Get-Acl $Image
+				#Get Access Control List from process image
+				if($imageACLs = Get-Acl $Image -ErrorAction SilentlyContinue){
 				
-				ForEach($ACL in $imageACLs.Access){
-					
-					If ($ACL.FileSystemRights -match "(FullControl|Modify)"){
-						If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $LocalSIDs_regex){
-							Write-Output "Vulnerable program: " $Image
-							Write-Output "Authorized group: " $ACL.IdentityReference.Value
+					ForEach($ACL in $imageACLs.Access){
+						
+						If ($ACL.FileSystemRights -match "(FullControl|Modify|Write)"){
+							If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $LocalSIDs_regex){
+								Write-Host "====================================================="
+								Write-Host "Vulnerable program:" 
+								Write-Host $Image
+								Write-Host "  Authorized group: " $ACL.IdentityReference.Value
+								Write-Host "=====================================================`n`n"
+							}
+							If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $DomainSIDs_regex){
+								Write-Host "====================================================="
+								Write-Host "Vulnerable program:" 
+								Write-Host $Image
+								Write-Host "  Authorized group: " $ACL.IdentityReference.Value
+								Write-Host "=====================================================`n`n"
+							}
 						}
-						If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $DomainSIDs_regex){
-							Write-Output "Vulnerable program: " $Image
-							Write-Output "Authorized group: " $ACL.IdentityReference.Value
-						}
+						
 					}
-					
+				}
+				Else {
+					Write-Host "Could not retrieve ACL from " $Image "`n`n"
 				}
 			}
 		}
