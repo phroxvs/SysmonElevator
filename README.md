@@ -5,7 +5,7 @@ SysmonElevator is a WhiteBox Windows privilege escalation tool. As it uses the S
 It may turn out beneficial to carry out typical client self-management actions while testing. For example, requesting and installing software packets from software distribution. 
 
 ###Usage:
-Open privileged powershell and set the execution policy to 'bypass'. Run SysmonElevator.ps1.
+Open privileged PowerShell and set the execution policy to 'bypass'. Run SysmonElevator.ps1.
 
 Additionally, the script parameter "-parseCommandLine" can be used. When enabled, also the CommandLine of all created processes in the Sysmon log will be evaluated. Sometimes it's possible that privileged processes run script files from writable locations.
 
