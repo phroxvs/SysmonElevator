@@ -6,5 +6,5 @@ It may turn out beneficial to carry out typical client self-management actions w
 
 ###Usage:
 Open privileged powershell and set the execution policy to 'bypass'. Run SysmonElevator.ps1.
-
+Additionally, the script parameter "-parseCommandLine" can be used. When enabled, also the CommandLine of all created processes in the Sysmon log will be evaluated. Sometimes it's possible that privileged processes run script files from writable locations.
 
