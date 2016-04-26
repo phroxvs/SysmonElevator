@@ -1,5 +1,10 @@
 #Event-Parsing: Thanks to http://blogs.technet.com/b/ashleymcglone/archive/2013/08/28/powershell-get-winevent-xml-madness-getting-details-from-event-logs.aspx
 #Get-Acl: Thanks to http://blogs.technet.com/b/heyscriptingguy/archive/2009/09/14/hey-scripting-guy-september-14-2009.aspx
+
+#Parameter definition: enable parsing of CommmandLine parameters
+param([switch]$parseCommandLine = $False)
+
+#Get Events from Sysmon EVTX log
 $Events = Get-WinEvent -FilterHashtable @{logname="Microsoft-Windows-Sysmon/Operational";id=1;}
 
 #Well-known SIDs https://support.microsoft.com/en-us/kb/243330
@@ -40,7 +45,11 @@ ForEach ($Event in $Events) {
 		#Extract process image path           
         If (($eventXML.Event.EventData.Data[$i].name -eq "Image")){
 			$Image = $eventXML.Event.EventData.Data[$i].'#text'
-		}		
+		}
+		#Extract command line parameters
+		If (($eventXML.Event.EventData.Data[$i].name -eq "CommandLine")){
+			$CommandLine = $eventXML.Event.EventData.Data[$i].'#text'
+		}
 		#Identify processes that are executed in context of NT-AUTHORITY\SYSTEM
 		If ($eventXML.Event.EventData.Data[$i].name -eq "User") {
 			$match = $FALSE;
@@ -57,11 +66,10 @@ ForEach ($Event in $Events) {
 			
 			If ($match){
 				#Get Access Control List from process image
-				if($imageACLs = Get-Acl $Image -ErrorAction SilentlyContinue){
-				
+				if($imageACLs = Get-Acl $Image -ErrorAction SilentlyContinue){				
 					ForEach($ACL in $imageACLs.Access){
 						
-						If ($ACL.FileSystemRights -match "(FullControl|Modify|Write)"){
+						If ($ACL.FileSystemRights -match "(FullControl|Modify)"){
 							If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $LocalSIDs_regex){
 								Write-Host "====================================================="
 								Write-Host "Vulnerable program:" 
@@ -83,11 +91,41 @@ ForEach ($Event in $Events) {
 				Else {
 					Write-Host "Could not retrieve ACL from " $Image "`n`n"
 				}
+				#Check if CommandLine parsing is enabled
+				If($parseCommandLine){
+					#Regex for extracting paths from the CommandLine [A-Z]:\\[A-Za-z0-9 _#\.\\]+\.[A-Za-z0-9]{3}(\s|")
+					#CommandLine parameter handling - it may be the case that a program is vulnerable because of writable Input files:
+					Select-String '([A-Z]:\\[A-Za-z0-9 _#\.\\]+\.[A-Za-z0-9]{3})(\s|")' -input $CommandLine -AllMatches | Foreach { $_.matches} | Foreach {
+						if($commandACLs = Get-Acl $_.groups[1].value -ErrorAction SilentlyContinue){				
+							ForEach($ACL in $commandACLs.Access){
+								
+								If ($ACL.FileSystemRights -match "(FullControl|Modify)"){
+									If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $LocalSIDs_regex){
+										Write-Host "====================================================="
+										Write-Host "Program:" 
+										Write-Host $Image
+										Write-Host "`n  Vulnerable command line parameter:" $_.groups[1].value
+										Write-Host "  Authorized group: " $ACL.IdentityReference.Value
+										Write-Host "=====================================================`n`n"
+									}
+									If($ACL.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -match $DomainSIDs_regex){
+										Write-Host "====================================================="
+										Write-Host "Program:" 
+										Write-Host $Image
+										Write-Host "`n  Vulnerable command line parameter:" $_.groups[1].value
+										Write-Host "  Authorized group: " $ACL.IdentityReference.Value
+										Write-Host "=====================================================`n`n"
+									}
+								}
+								
+							}
+						}
+						Else {
+							Write-Host "Could not retrieve ACL from " $_.groups[1].value "`n`n"
+						}
+					}				
+				}
 			}
 		}
-		
-    } 
-           
+    }    
 }      
-
-#$Events
